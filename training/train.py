@@ -13,9 +13,10 @@ import mlflow.xgboost
 import pandas as pd
 import xgboost as xgb
 
-from data.split_data import PROCESSED_DIR, split_temporal
-from training.evaluate import evaluate_predictions
+from data.split_data import PROCESSED_DIR, TEST_HOLDOUT_PATH, split_temporal
+from training.evaluate import bootstrap_confidence_intervals, evaluate_predictions
 from training.feature_engineering import ARTIFACTS_DIR, FeatureTransformer
+from training.imbalance import SUPPORTED_RESAMPLING_METHODS, resample_training_data
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -30,6 +31,9 @@ def train_baseline_model(
     val_path: Path | None = None,
     tag_as_production: bool = True,
     model_params: dict | None = None,
+    resampling_method: str = "none",
+    false_positive_cost: float = 1.0,
+    false_negative_cost: float = 25.0,
 ) -> tuple[xgb.XGBClassifier, dict, str]:
     """Trains an XGBoost fraud detection model, tracks experiment in MLflow, and registers the model.
 
@@ -43,7 +47,8 @@ def train_baseline_model(
         (trained_model, metrics_dict, mlflow_run_id)
     """
     # 1. Ensure data exists
-    if train_path is None or not train_path.exists():
+    test_path = TEST_HOLDOUT_PATH
+    if train_path is None or not train_path.exists() or not test_path.exists():
         train_path = PROCESSED_DIR / "train.parquet"
         val_path = PROCESSED_DIR / "val_holdout.parquet"
         if not train_path.exists() or not val_path.exists():
@@ -54,19 +59,30 @@ def train_baseline_model(
     )
     train_df = pd.read_parquet(train_path)
     val_df = pd.read_parquet(val_path)
+    test_df = pd.read_parquet(test_path)
 
     y_train = train_df["Class"].values
     y_val = val_df["Class"].values
+    y_test = test_df["Class"].values
 
     # 2. Feature Engineering & Scaling
     transformer = FeatureTransformer()
     X_train = transformer.fit(train_df).transform(train_df)
     X_val = transformer.transform(val_df)
+    X_test = transformer.transform(test_df)
 
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     transformer.save(ARTIFACTS_DIR / "preprocessor.joblib")
 
-    # 3. Calculate class imbalance weight
+    # 3. Resample only the training fold, then configure cost-sensitive weighting.
+    if resampling_method not in SUPPORTED_RESAMPLING_METHODS:
+        supported = ", ".join(sorted(SUPPORTED_RESAMPLING_METHODS))
+        raise ValueError(
+            f"Unsupported resampling method '{resampling_method}'. Choose one of: {supported}."
+        )
+    X_train, y_train = resample_training_data(X_train, y_train, method=resampling_method)
+
+    # Class weights are retained for the original distribution. Resampled folds are balanced.
     # scale_pos_weight = total_negative / total_positive
     n_neg = (y_train == 0).sum()
     n_pos = (y_train == 1).sum()
@@ -86,7 +102,7 @@ def train_baseline_model(
         "learning_rate": 0.08,
         "subsample": 0.85,
         "colsample_bytree": 0.85,
-        "scale_pos_weight": computed_scale_pos_weight,
+        "scale_pos_weight": computed_scale_pos_weight if resampling_method == "none" else 1.0,
         "eval_metric": ["logloss", "aucpr"],
         "random_state": 42,
         "n_jobs": -1,
@@ -108,6 +124,9 @@ def train_baseline_model(
         mlflow.log_param("train_samples", len(train_df))
         mlflow.log_param("val_samples", len(val_df))
         mlflow.log_param("class_imbalance_ratio", f"1:{int(computed_scale_pos_weight)}")
+        mlflow.log_param("resampling_method", resampling_method)
+        mlflow.log_param("false_positive_cost", false_positive_cost)
+        mlflow.log_param("false_negative_cost", false_negative_cost)
 
         # 6. Train Model
         model = xgb.XGBClassifier(**default_params)
@@ -120,7 +139,28 @@ def train_baseline_model(
 
         # 7. Evaluate on Frozen Holdout Validation Set
         val_probs = model.predict_proba(X_val)[:, 1]
-        metrics = evaluate_predictions(y_val, val_probs)
+        metrics = evaluate_predictions(
+            y_val,
+            val_probs,
+            threshold_strategy="cost",
+            false_positive_cost=false_positive_cost,
+            false_negative_cost=false_negative_cost,
+        )
+        test_probs = model.predict_proba(X_test)[:, 1]
+        test_metrics = evaluate_predictions(
+            y_test,
+            test_probs,
+            threshold=metrics["threshold"],
+            false_positive_cost=false_positive_cost,
+            false_negative_cost=false_negative_cost,
+        )
+        test_confidence_intervals = bootstrap_confidence_intervals(
+            y_test,
+            test_probs,
+            threshold=metrics["threshold"],
+            false_positive_cost=false_positive_cost,
+            false_negative_cost=false_negative_cost,
+        )
 
         # Log metrics to MLflow
         mlflow.log_metrics(metrics)
@@ -138,6 +178,8 @@ def train_baseline_model(
             {
                 "model": model,
                 "metrics": metrics,
+                "test_metrics": test_metrics,
+                "test_confidence_intervals": test_confidence_intervals,
                 "run_id": run_id,
                 "threshold": metrics["threshold"],
             },
@@ -149,6 +191,8 @@ def train_baseline_model(
                 {
                     "run_id": run_id,
                     "metrics": metrics,
+                    "test_metrics": test_metrics,
+                    "test_confidence_intervals": test_confidence_intervals,
                     "threshold": metrics["threshold"],
                     "is_production": tag_as_production,
                 },

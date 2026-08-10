@@ -161,6 +161,16 @@ python -m scripts.simulate_production
 
 This command may generate source data, reports, MLflow state, and new local model artifacts. Run it only in a disposable local development environment unless those outputs are intentionally managed.
 
+## Imbalanced-learning and evaluation policy
+
+Fraud labels are highly imbalanced, so raw accuracy is not a model-selection metric. The pipeline reports PR-AUC, precision, recall, specificity, F1, G-mean, false-negative rate, false-positive rate, expected cost, and cost per transaction.
+
+By default it uses cost-sensitive XGBoost weighting derived from the training-fold class ratio. The training API also supports optional resampling methods: `smote`, `adasyn`, `smoteenn`, and `smotetomek`. Resampling is performed **only after feature transformation on the training fold**; validation, production replay, and final test records are never resampled.
+
+The temporal split is 65% training, 15% validation, 10% production replay, and 10% final test. The validation window selects the operating threshold, while the final test period is held untouched until after selection. Training saves post-selection test metrics and 95% bootstrap confidence intervals for PR-AUC, F1, recall, specificity, G-mean, and expected cost in the model metadata.
+
+The default cost policy treats one false negative as 25 times the cost of one false positive. Adjust `false_positive_cost` and `false_negative_cost` in `train_baseline_model` or `train_challenger` to match investigation and fraud-loss economics.
+
 ## Development workflow
 
 ```bash

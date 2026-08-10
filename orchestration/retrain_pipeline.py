@@ -17,6 +17,7 @@ from data.split_data import PROCESSED_DIR, split_temporal
 from monitoring.drift_detector import evaluate_drift
 from training.evaluate import evaluate_predictions
 from training.feature_engineering import ARTIFACTS_DIR, FeatureTransformer
+from training.imbalance import resample_training_data
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -72,6 +73,9 @@ def load_retraining_data(
 def train_challenger(
     train_df: pd.DataFrame,
     val_df: pd.DataFrame,
+    resampling_method: str = "none",
+    false_positive_cost: float = 1.0,
+    false_negative_cost: float = 25.0,
 ) -> tuple[xgb.XGBClassifier, dict, str, str]:
     """Trains a Challenger model and logs it to MLflow as a Candidate."""
     y_train = train_df["Class"].values
@@ -80,6 +84,7 @@ def train_challenger(
     transformer = FeatureTransformer()
     X_train = transformer.fit(train_df).transform(train_df)
     X_val = transformer.transform(val_df)
+    X_train, y_train = resample_training_data(X_train, y_train, method=resampling_method)
 
     n_neg = (y_train == 0).sum()
     n_pos = (y_train == 1).sum()
@@ -91,7 +96,7 @@ def train_challenger(
         "learning_rate": 0.07,
         "subsample": 0.85,
         "colsample_bytree": 0.85,
-        "scale_pos_weight": scale_pos_weight,
+        "scale_pos_weight": scale_pos_weight if resampling_method == "none" else 1.0,
         "eval_metric": ["logloss", "aucpr"],
         "random_state": 99,
         "tree_method": "hist",
@@ -104,6 +109,7 @@ def train_challenger(
         run_id = run.info.run_id
         mlflow.log_params(params)
         mlflow.log_param("role", "challenger")
+        mlflow.log_param("resampling_method", resampling_method)
         mlflow.log_param("retrained_at", datetime.now(timezone.utc).isoformat())
 
         challenger_model = xgb.XGBClassifier(**params)
@@ -115,7 +121,13 @@ def train_challenger(
         )
 
         val_probs = challenger_model.predict_proba(X_val)[:, 1]
-        metrics = evaluate_predictions(y_val, val_probs)
+        metrics = evaluate_predictions(
+            y_val,
+            val_probs,
+            threshold_strategy="cost",
+            false_positive_cost=false_positive_cost,
+            false_negative_cost=false_negative_cost,
+        )
         mlflow.log_metrics(metrics)
 
         # Log artifact to MLflow
