@@ -77,8 +77,9 @@ def rollback_production_model(target_version: str | int | None = None) -> bool:
 
         # 3. Notify serving layer
         try:
+            admin_key = os.getenv("ADMIN_API_KEY", "dev-admin-key")
             with httpx.Client(timeout=5.0) as http_client:
-                resp = http_client.post(f"{SERVING_URL}/reload-model")
+                resp = http_client.post(f"{SERVING_URL}/reload-model", headers={"x-api-key": admin_key})
                 if resp.status_code == 200:
                     logger.info("Serving layer reloaded rolled back model version %s.", target_v)
         except Exception as exc:

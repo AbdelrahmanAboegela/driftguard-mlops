@@ -66,3 +66,14 @@ def test_metrics_endpoint(client):
     resp = client.get("/metrics")
     assert resp.status_code == 200
     assert "driftguard_http_requests_total" in resp.text
+
+
+def test_reload_model_endpoint_auth(client):
+    # Missing/invalid key should return 401
+    resp_unauth = client.post("/reload-model", headers={"x-api-key": "invalid-key"})
+    assert resp_unauth.status_code == 401
+
+    # Valid key should succeed
+    resp_auth = client.post("/reload-model", headers={"x-api-key": "dev-admin-key"})
+    assert resp_auth.status_code == 200
+    assert resp_auth.json()["status"] == "success"
