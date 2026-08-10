@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 MODEL_REGISTRY_NAME = os.getenv("MLFLOW_MODEL_NAME", "driftguard-fraud")
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
 
 
 class ModelManager:
@@ -57,43 +57,52 @@ class ModelManager:
                 train_baseline_model()
                 self.transformer = FeatureTransformer.load(preprocessor_path)
 
-            # 2. Try loading from MLflow Registry
+            # 2. Try loading from MLflow Registry only when one is explicitly configured.
+            # Local serving intentionally uses the bundled champion artifact; attempting to
+            # initialize an implicit SQLite store makes a non-root container block on retries.
             loaded_from_mlflow = False
-            try:
-                mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-                client = mlflow.tracking.MlflowClient()
-
-                # Try alias 'production' or stage 'Production'
-                model_uri = None
+            if MLFLOW_TRACKING_URI:
                 try:
-                    alias_model = client.get_model_version_by_alias(
-                        MODEL_REGISTRY_NAME, "production"
-                    )
-                    model_uri = f"models:/{MODEL_REGISTRY_NAME}@production"
-                    self.model_version = f"v{alias_model.version}"
-                except Exception:
-                    # Fallback to stage using search_model_versions
-                    filter_string = f"name='{MODEL_REGISTRY_NAME}'"
-                    versions = client.search_model_versions(filter_string)
-                    production_versions = [v for v in versions if v.current_stage == "Production"]
-                    if production_versions:
-                        # Sort by version number descending
-                        latest_prod = sorted(
-                            production_versions, key=lambda v: int(v.version), reverse=True
-                        )[0]
-                        model_uri = f"models:/{MODEL_REGISTRY_NAME}/Production"
-                        self.model_version = f"v{latest_prod.version}"
+                    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+                    client = mlflow.tracking.MlflowClient()
 
-                if model_uri:
-                    logger.info("Loading production model from MLflow Registry: %s...", model_uri)
-                    self.model = mlflow.xgboost.load_model(model_uri)
-                    loaded_from_mlflow = True
-                    logger.info("Successfully loaded MLflow model version: %s", self.model_version)
-            except Exception as exc:
-                logger.warning(
-                    "Could not load from MLflow Model Registry (%s). Falling back to local artifact.",
-                    exc,
-                )
+                    # Try alias 'production' or stage 'Production'
+                    model_uri = None
+                    try:
+                        alias_model = client.get_model_version_by_alias(
+                            MODEL_REGISTRY_NAME, "production"
+                        )
+                        model_uri = f"models:/{MODEL_REGISTRY_NAME}@production"
+                        self.model_version = f"v{alias_model.version}"
+                    except Exception:
+                        # Fallback to stage using search_model_versions
+                        filter_string = f"name='{MODEL_REGISTRY_NAME}'"
+                        versions = client.search_model_versions(filter_string)
+                        production_versions = [
+                            v for v in versions if v.current_stage == "Production"
+                        ]
+                        if production_versions:
+                            # Sort by version number descending
+                            latest_prod = sorted(
+                                production_versions, key=lambda v: int(v.version), reverse=True
+                            )[0]
+                            model_uri = f"models:/{MODEL_REGISTRY_NAME}/Production"
+                            self.model_version = f"v{latest_prod.version}"
+
+                    if model_uri:
+                        logger.info(
+                            "Loading production model from MLflow Registry: %s...", model_uri
+                        )
+                        self.model = mlflow.xgboost.load_model(model_uri)
+                        loaded_from_mlflow = True
+                        logger.info(
+                            "Successfully loaded MLflow model version: %s", self.model_version
+                        )
+                except Exception as exc:
+                    logger.warning(
+                        "Could not load from MLflow Model Registry (%s). Falling back to local artifact.",
+                        exc,
+                    )
 
             # 3. Fallback to local artifact
             if not loaded_from_mlflow:
