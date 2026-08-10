@@ -23,7 +23,7 @@ def run_drift_monitor_iteration() -> dict:
     logger.info("Starting drift assessment cycle...")
     result = evaluate_drift(save_reports=True)
 
-    status_str = "⚠️ DRIFT ALERT DETECTED" if result["drift_detected"] else "✅ SYSTEM HEALTHY (No Drift)"
+    status_str = "[!] DRIFT ALERT DETECTED" if result["drift_detected"] else "[OK] SYSTEM HEALTHY (No Drift)"
     logger.info(
         "\n================ DRIFTGUARD STATUS ================\n"
         "  Status:             %s\n"

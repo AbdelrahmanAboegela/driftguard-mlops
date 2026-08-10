@@ -40,7 +40,7 @@ class FeatureTransformer(BaseEstimator, TransformerMixin):
     def fit(self, X: pd.DataFrame, y: pd.Series | None = None) -> FeatureTransformer:
         """Fits scalers on training transactions."""
         df = X.copy()
-        amounts = df[["Amount"]].values
+        amounts = df[["Amount"]]
         self.amount_scaler.fit(amounts)
         self.is_fitted = True
         return self

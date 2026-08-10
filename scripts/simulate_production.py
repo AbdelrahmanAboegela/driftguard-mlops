@@ -175,18 +175,14 @@ def run_production_simulation(
     recovered_probs = [r["fraud_score"] for r in recovered_results]
     test_y = drift_test_data["Class"].values
 
-    # Stale model on the exact same test subset
-    stale_test_results, _ = model_manager.model_version, None
-    from training.feature_engineering import FeatureTransformer
-    import joblib
-
-    champion_payload = joblib.load(ARTIFACTS_DIR / "champion_model.joblib")
-    stale_metrics_on_test = evaluate_predictions(test_y, [r["fraud_score"] for r in stale_results[:len(test_records)]], threshold=0.5)
+    # Stale model metrics on test slice (already computed as part of stale_results)
+    stale_test_probs = [r["fraud_score"] for r in stale_results[n_retrain_drift:]]
+    stale_metrics_on_test = evaluate_predictions(test_y, stale_test_probs, threshold=0.5)
     recovered_metrics = evaluate_predictions(test_y, recovered_probs, threshold=model_manager.threshold)
 
-    f1_recovery_gain = recovered_metrics["f1"] - stale_drifted_metrics["f1"]
-    prauc_recovery_gain = recovered_metrics["pr_auc"] - stale_drifted_metrics["pr_auc"]
-    fnr_reduction = (stale_drifted_metrics["false_negative_rate"] - recovered_metrics["false_negative_rate"]) * 100
+    f1_recovery_gain = recovered_metrics["f1"] - stale_metrics_on_test["f1"]
+    prauc_recovery_gain = recovered_metrics["pr_auc"] - stale_metrics_on_test["pr_auc"]
+    fnr_reduction = (stale_metrics_on_test["false_negative_rate"] - recovered_metrics["false_negative_rate"]) * 100
 
     # Step 6: Assemble Comparative Results DataFrame
     comparison_records = [

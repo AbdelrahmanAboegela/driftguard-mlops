@@ -180,7 +180,7 @@ def evaluate_and_promote_challenger(
     }
 
     if is_promoted:
-        logger.info("🏆 CHALLENGER PROMOTED TO PRODUCTION (Version %s)", challenger_version)
+        logger.info("CHALLENGER PROMOTED TO PRODUCTION (Version %s)", challenger_version)
         # Update MLflow Registry tags and aliases
         try:
             client = mlflow.tracking.MlflowClient()
@@ -227,7 +227,7 @@ def evaluate_and_promote_challenger(
         except Exception as exc:
             logger.debug("Serving layer hot-reload notification skipped: %s", exc)
     else:
-        logger.warning("❌ CHALLENGER REJECTED. Maintaining Champion in production.")
+        logger.warning("CHALLENGER REJECTED. Maintaining Champion in production.")
 
     return decision
 

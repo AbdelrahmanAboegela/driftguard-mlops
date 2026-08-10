@@ -74,6 +74,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for startup and shutdown initialization."""
     logger.info("Initializing DriftGuard inference service...")
     model_manager.load()
+    ACTIVE_MODEL_VERSION._metrics.clear()
     ACTIVE_MODEL_VERSION.labels(version=model_manager.model_version).set(1)
     yield
     logger.info("DriftGuard inference service shutting down.")
@@ -223,6 +224,7 @@ async def reload_model() -> dict[str, str]:
     """Hot-reloads the production model from MLflow Registry or local store."""
     try:
         model_manager.load(force_reload=True)
+        ACTIVE_MODEL_VERSION._metrics.clear()
         ACTIVE_MODEL_VERSION.labels(version=model_manager.model_version).set(1)
         logger.info("Hot-reloaded model version: %s", model_manager.model_version)
         return {

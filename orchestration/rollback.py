@@ -84,7 +84,7 @@ def rollback_production_model(target_version: str | int | None = None) -> bool:
         except Exception as exc:
             logger.debug("Serving layer notification: %s", exc)
 
-        logger.info("✅ SUCCESS: Rolled back production model to Version %s", target_v)
+        logger.info("SUCCESS: Rolled back production model to Version %s", target_v)
         return True
 
     except Exception as exc:
