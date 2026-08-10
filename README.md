@@ -176,20 +176,20 @@ The default cost policy treats one false negative as 25 times the cost of one fa
 Run every supported strategy against one fixed temporal test period:
 
 ```bash
-python -m scripts.compare_imbalance_strategies --samples 120000 --seed 42
+python -m scripts.compare_imbalance_strategies --data-source kaggle --seed 42
 ```
 
-The following measured run used 120,000 deterministic synthetic transactions (0.1717% fraud), a 65%/15%/10%/10% temporal split, 78,000 pre-resampling training rows, 12,000 untouched test rows, 27 test fraud cases, 100 XGBoost estimators, and a 25:1 false-negative:false-positive cost ratio.
+The following measured run used the Kaggle `mlg-ulb/creditcardfraud` data, a 65%/15%/10%/10% temporal split, 185,124 pre-resampling training rows, 28,481 untouched test rows, 22 test fraud cases, 100 XGBoost estimators, and a 25:1 false-negative:false-positive cost ratio.
 
 | Strategy | Train rows | Threshold | PR-AUC | F1 | Recall | Specificity | G-mean (95% CI) | FN / FP | Expected cost | Runtime (s) |
 | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: |
-| Cost-sensitive weight only | 78,000 | 0.999822 | 1.0000 | 0.9615 | 0.9259 | 1.0000 | 0.9623 (0.9044–1.0000) | 2 / 0 | 50 | 2.72 |
-| SMOTE | 155,736 | 0.999786 | 1.0000 | 0.9615 | 0.9259 | 1.0000 | 0.9623 (0.8885–1.0000) | 2 / 0 | 50 | 6.65 |
-| ADASYN | 155,736 | 0.926126 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 (1.0000–1.0000) | 0 / 0 | 0 | 3.47 |
-| SMOTEENN | 155,734 | 0.999795 | 1.0000 | 0.9615 | 0.9259 | 1.0000 | 0.9623 (0.8885–1.0000) | 2 / 0 | 50 | 34.47 |
-| SMOTETomek | 155,736 | 0.999786 | 1.0000 | 0.9615 | 0.9259 | 1.0000 | 0.9623 (0.8885–1.0000) | 2 / 0 | 50 | 47.45 |
+| Cost-sensitive weight only | 185,124 | 0.726966 | 0.6947 | 0.6038 | 0.7273 | 0.9995 | 0.8526 (0.7382–0.9392) | 6 / 15 | 165 | 14.33 |
+| SMOTE | 369,512 | 0.743935 | 0.7107 | 0.3678 | 0.7273 | 0.9983 | 0.8521 (0.7377–0.9386) | 6 / 49 | 199 | 17.54 |
+| ADASYN | 369,532 | 0.907620 | 0.6090 | 0.4225 | 0.6818 | 0.9988 | 0.8252 (0.6828–0.9218) | 7 / 34 | 209 | 14.55 |
+| SMOTEENN | 369,197 | 0.965900 | 0.6853 | 0.6667 | 0.6818 | 0.9997 | 0.8256 (0.7067–0.9218) | 7 / 8 | 183 | 212.74 |
+| SMOTETomek | 369,512 | 0.743935 | 0.7107 | 0.3678 | 0.7273 | 0.9983 | 0.8521 (0.7377–0.9386) | 6 / 49 | 199 | 194.15 |
 
-The benchmark CSV is written to `reports/imbalance_benchmark.csv`. Its perfect PR-AUC scores reflect the deliberately separable synthetic fraud generator and should **not** be treated as a production-performance claim. Repeat this comparison on a representative, labelled production dataset before selecting a resampling strategy. The final model decision should consider the confidence intervals and cost impact, not a single point estimate.
+The benchmark CSV is written to `reports/imbalance_benchmark.csv`. This is an offline Kaggle benchmark, not a production-performance claim: the final test period contains only 22 fraud cases, so confidence intervals remain wide. The cost-sensitive baseline has the lowest expected cost (165), while SMOTE gives the highest PR-AUC (0.7107); select a model based on your operational fraud-loss and investigation costs rather than a single point metric.
 
 ## Development workflow
 

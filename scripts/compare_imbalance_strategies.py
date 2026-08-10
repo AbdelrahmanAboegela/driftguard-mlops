@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 import xgboost as xgb
 
-from data.get_data import generate_synthetic_fraud_dataset
+from data.get_data import ensure_dataset, generate_synthetic_fraud_dataset
 from training.evaluate import bootstrap_confidence_intervals, evaluate_predictions
 from training.feature_engineering import FeatureTransformer
 from training.imbalance import SUPPORTED_RESAMPLING_METHODS, resample_training_data
@@ -23,12 +23,18 @@ def benchmark(
     random_state: int = 42,
     false_positive_cost: float = 1.0,
     false_negative_cost: float = 25.0,
+    data_source: str = "synthetic",
 ) -> pd.DataFrame:
     """Run every supported resampling configuration with an untouched temporal test set."""
     if set(METHODS) - SUPPORTED_RESAMPLING_METHODS:
         raise RuntimeError("Benchmark methods must be supported by the imbalance module.")
 
-    data = generate_synthetic_fraud_dataset(n_samples=n_samples, random_seed=random_state)
+    if data_source == "synthetic":
+        data = generate_synthetic_fraud_dataset(n_samples=n_samples, random_seed=random_state)
+    elif data_source == "kaggle":
+        data = pd.read_csv(ensure_dataset())
+    else:
+        raise ValueError("data_source must be either 'synthetic' or 'kaggle'.")
     train_end = int(len(data) * 0.65)
     validation_end = int(len(data) * 0.80)
     production_end = int(len(data) * 0.90)
@@ -126,12 +132,14 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--false-positive-cost", type=float, default=1.0)
     parser.add_argument("--false-negative-cost", type=float, default=25.0)
+    parser.add_argument("--data-source", choices=("synthetic", "kaggle"), default="synthetic")
     args = parser.parse_args()
     report = benchmark(
         n_samples=args.samples,
         random_state=args.seed,
         false_positive_cost=args.false_positive_cost,
         false_negative_cost=args.false_negative_cost,
+        data_source=args.data_source,
     )
     print(report.to_string(index=False))
     print(f"\nSaved benchmark results to {REPORT_PATH}")

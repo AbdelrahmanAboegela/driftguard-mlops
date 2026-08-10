@@ -1,20 +1,69 @@
 {
-  "version": 10,
+  "run_id": "0601d7d489c74e9692f27bfcd5b75e47",
   "metrics": {
-    "pr_auc": 0.8500569578223438,
-    "f1": 0.8712871287128713,
-    "precision": 0.9777777777777777,
-    "recall": 0.7857142857142857,
-    "roc_auc": 0.9864567812358742,
-    "brier_score": 0.0011183924824051952,
-    "false_negative_rate": 0.21428571428571427,
-    "false_positive_rate": 2.3438415563107934e-05,
-    "threshold": 0.9227768182754517,
-    "true_positives": 44,
-    "false_positives": 1,
-    "true_negatives": 42664,
-    "false_negatives": 12
+    "pr_auc": 0.7638298514178804,
+    "f1": 0.65,
+    "precision": 0.5492957746478874,
+    "recall": 0.7959183673469388,
+    "roc_auc": 0.9772091626301814,
+    "brier_score": 0.0005954706119573249,
+    "false_negative_rate": 0.20408163265306123,
+    "false_positive_rate": 0.0007499062617172854,
+    "specificity": 0.9992500937382827,
+    "g_mean": 0.8918079968129068,
+    "expected_cost": 282.0,
+    "cost_per_transaction": 0.006600969078439175,
+    "threshold": 0.2852120101451874,
+    "true_positives": 39,
+    "false_positives": 32,
+    "true_negatives": 42640,
+    "false_negatives": 10
   },
-  "threshold": 0.9227768182754517,
-  "promoted_at": "2026-08-10T17:43:09.534247+00:00"
+  "test_metrics": {
+    "pr_auc": 0.7216976386864586,
+    "f1": 0.48484848484848486,
+    "precision": 0.36363636363636365,
+    "recall": 0.7272727272727273,
+    "roc_auc": 0.9745391296570185,
+    "brier_score": 0.0006752720809410997,
+    "false_negative_rate": 0.2727272727272727,
+    "false_positive_rate": 0.0009838715344882112,
+    "specificity": 0.9990161284655118,
+    "g_mean": 0.852383237950251,
+    "expected_cost": 178.0,
+    "cost_per_transaction": 0.006249780555458025,
+    "threshold": 0.2852120101451874,
+    "true_positives": 16,
+    "false_positives": 28,
+    "true_negatives": 28431,
+    "false_negatives": 6
+  },
+  "test_confidence_intervals": {
+    "pr_auc": {
+      "lower": 0.5017454439747702,
+      "upper": 0.885241986904432
+    },
+    "f1": {
+      "lower": 0.3213293650793651,
+      "upper": 0.6363636363636364
+    },
+    "recall": {
+      "lower": 0.5330952380952382,
+      "upper": 0.8752403846153847
+    },
+    "specificity": {
+      "lower": 0.998663685513725,
+      "upper": 0.999332281969793
+    },
+    "g_mean": {
+      "lower": 0.7297243982572008,
+      "upper": 0.9351947478535034
+    },
+    "expected_cost": {
+      "lower": 81.90000000000002,
+      "upper": 302.05
+    }
+  },
+  "threshold": 0.2852120101451874,
+  "is_production": true
 }
