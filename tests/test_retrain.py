@@ -20,7 +20,8 @@ def _create_mock_data(n=200):
     return pd.DataFrame(data)
 
 
-def test_train_challenger_and_evaluate(tmp_path):
+def test_train_challenger_and_evaluate(tmp_path, monkeypatch):
+    monkeypatch.setattr("orchestration.retrain_pipeline.ARTIFACTS_DIR", tmp_path)
     train_df = _create_mock_data(250)
     val_df = _create_mock_data(80)
 
