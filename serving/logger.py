@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-import sqlite3
+
 import pandas as pd
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -50,7 +51,9 @@ class PredictionLogger:
                 """
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON prediction_logs(timestamp);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_request_id ON prediction_logs(request_id);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_request_id ON prediction_logs(request_id);"
+            )
 
     def log_prediction(
         self,

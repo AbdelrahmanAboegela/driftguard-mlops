@@ -7,7 +7,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from pathlib import Path
+
 import httpx
 import mlflow
 
@@ -42,7 +42,10 @@ def rollback_production_model(target_version: str | int | None = None) -> bool:
         if target_version is None:
             # Find the previous version before the latest
             if len(sorted_versions) < 2:
-                logger.warning("Only 1 version exists (Version %s). Rollback not possible.", sorted_versions[0].version)
+                logger.warning(
+                    "Only 1 version exists (Version %s). Rollback not possible.",
+                    sorted_versions[0].version,
+                )
                 return False
             target_v_obj = sorted_versions[-2]
             target_v = target_v_obj.version
@@ -79,7 +82,9 @@ def rollback_production_model(target_version: str | int | None = None) -> bool:
         try:
             admin_key = os.getenv("ADMIN_API_KEY", "dev-admin-key")
             with httpx.Client(timeout=5.0) as http_client:
-                resp = http_client.post(f"{SERVING_URL}/reload-model", headers={"x-api-key": admin_key})
+                resp = http_client.post(
+                    f"{SERVING_URL}/reload-model", headers={"x-api-key": admin_key}
+                )
                 if resp.status_code == 200:
                     logger.info("Serving layer reloaded rolled back model version %s.", target_v)
         except Exception as exc:
@@ -95,7 +100,9 @@ def rollback_production_model(target_version: str | int | None = None) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="DriftGuard Model Rollback Utility")
-    parser.add_argument("--version", type=str, default=None, help="Target model version number to restore")
+    parser.add_argument(
+        "--version", type=str, default=None, help="Target model version number to restore"
+    )
     args = parser.parse_args()
     rollback_production_model(args.version)
 

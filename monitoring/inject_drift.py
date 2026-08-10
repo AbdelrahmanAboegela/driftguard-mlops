@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+
 import numpy as np
 import pandas as pd
 
@@ -29,7 +30,9 @@ def inject_feature_drift(
 
     # 1. Amount Drift (Macroeconomic inflation + large holiday shopping transactions)
     amount_jitter = rng.lognormal(mean=0.3, sigma=0.4, size=n)
-    df_drifted["Amount"] = np.clip(df_drifted["Amount"] * amount_scale * amount_jitter, 0.5, 35000.0)
+    df_drifted["Amount"] = np.clip(
+        df_drifted["Amount"] * amount_scale * amount_jitter, 0.5, 35000.0
+    )
 
     # 2. PCA Covariate Drift
     if pca_shift_features is None:
@@ -70,7 +73,9 @@ def inject_concept_drift(
 
     df_drifted.loc[fraud_indices, "Class"] = 1
     # For new evasion fraud, set subtle amounts ($1.00 - $15.00 card testing)
-    df_drifted.loc[fraud_indices, "Amount"] = np.round(rng.uniform(1.0, 15.0, size=n_extra_fraud), 2)
+    df_drifted.loc[fraud_indices, "Amount"] = np.round(
+        rng.uniform(1.0, 15.0, size=n_extra_fraud), 2
+    )
 
     # Evasion patterns in latent space
     for col, shift in [("V4", 2.5), ("V11", 2.0), ("V14", -3.5)]:

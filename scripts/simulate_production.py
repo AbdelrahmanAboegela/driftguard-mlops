@@ -12,30 +12,21 @@ Demonstrates:
 from __future__ import annotations
 
 import logging
-import sys
 import time
 from pathlib import Path
-
-# Add project root to sys.path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 import pandas as pd
 
 from data.split_data import PROCESSED_DIR, split_temporal
-from monitoring.drift_detector import compute_feature_drift_stats, evaluate_drift
+from monitoring.drift_detector import compute_feature_drift_stats
 from monitoring.inject_drift import inject_concept_drift, inject_feature_drift
 from orchestration.retrain_pipeline import (
     evaluate_and_promote_challenger,
     load_retraining_data,
     train_challenger,
 )
-from serving.logger import prediction_logger
 from serving.model_loader import model_manager
 from training.evaluate import evaluate_predictions
-from training.feature_engineering import ARTIFACTS_DIR
-from training.train import train_baseline_model
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -107,17 +98,25 @@ def run_production_simulation(
     )
 
     # Step 3: Replay Drifted Phase on Stale Baseline Model
-    logger.info("\n--- Phase 2: Injected Drift & Stale Model Evaluation (Steps %d to %d) ---", drift_step, len(full_stream))
+    logger.info(
+        "\n--- Phase 2: Injected Drift & Stale Model Evaluation (Steps %d to %d) ---",
+        drift_step,
+        len(full_stream),
+    )
     drifted_records = drifted_segment.to_dict(orient="records")
     stale_results, stale_latency = model_manager.predict_batch(drifted_records)
 
     stale_probs = [r["fraud_score"] for r in stale_results]
     drifted_y = drifted_segment["Class"].values
-    stale_drifted_metrics = evaluate_predictions(drifted_y, stale_probs, threshold=model_manager.threshold)
+    stale_drifted_metrics = evaluate_predictions(
+        drifted_y, stale_probs, threshold=model_manager.threshold
+    )
 
     # Compute drift on drifted segment
     drift_stats = compute_feature_drift_stats(train_baseline_df, drifted_segment)
-    drift_detected = (drift_stats["share_drifted"] >= 0.20) or (drift_stats["max_feature_psi"] >= 0.25)
+    drift_detected = (drift_stats["share_drifted"] >= 0.20) or (
+        drift_stats["max_feature_psi"] >= 0.25
+    )
 
     logger.info(
         "Drift Assessment on Post-Drift Traffic:\n"
@@ -178,11 +177,15 @@ def run_production_simulation(
     # Stale model metrics on test slice (already computed as part of stale_results)
     stale_test_probs = [r["fraud_score"] for r in stale_results[n_retrain_drift:]]
     stale_metrics_on_test = evaluate_predictions(test_y, stale_test_probs, threshold=0.5)
-    recovered_metrics = evaluate_predictions(test_y, recovered_probs, threshold=model_manager.threshold)
+    recovered_metrics = evaluate_predictions(
+        test_y, recovered_probs, threshold=model_manager.threshold
+    )
 
     f1_recovery_gain = recovered_metrics["f1"] - stale_metrics_on_test["f1"]
     prauc_recovery_gain = recovered_metrics["pr_auc"] - stale_metrics_on_test["pr_auc"]
-    fnr_reduction = (stale_metrics_on_test["false_negative_rate"] - recovered_metrics["false_negative_rate"]) * 100
+    fnr_reduction = (
+        stale_metrics_on_test["false_negative_rate"] - recovered_metrics["false_negative_rate"]
+    ) * 100
 
     # Step 6: Assemble Comparative Results DataFrame
     comparison_records = [

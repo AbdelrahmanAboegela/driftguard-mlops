@@ -8,6 +8,7 @@ import logging
 import random
 import time
 import uuid
+
 import httpx
 import numpy as np
 
@@ -46,7 +47,12 @@ async def run_benchmark(
     concurrency: int = 25,
 ) -> dict:
     """Executes concurrent load testing and computes latency percentiles."""
-    logger.info("Starting load test against %s (Total: %d, Concurrency: %d)...", target_url, total_requests, concurrency)
+    logger.info(
+        "Starting load test against %s (Total: %d, Concurrency: %d)...",
+        target_url,
+        total_requests,
+        concurrency,
+    )
 
     limits = httpx.Limits(max_connections=concurrency + 10, max_keepalive_connections=concurrency)
     timeout = httpx.Timeout(10.0, connect=5.0)
@@ -114,7 +120,9 @@ async def run_benchmark(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="DriftGuard Load Testing & Profiling")
-    parser.add_argument("--url", type=str, default="http://localhost:8000/predict", help="Target endpoint")
+    parser.add_argument(
+        "--url", type=str, default="http://localhost:8000/predict", help="Target endpoint"
+    )
     parser.add_argument("--requests", type=int, default=300, help="Total requests to send")
     parser.add_argument("--concurrency", type=int, default=20, help="Concurrent workers")
     args = parser.parse_args()

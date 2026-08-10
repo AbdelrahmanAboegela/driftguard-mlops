@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+
 import pandas as pd
+
 from data.get_data import ensure_dataset
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")

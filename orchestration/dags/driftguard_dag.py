@@ -9,6 +9,7 @@ try:
     from airflow import DAG
     from airflow.operators.empty import EmptyOperator
     from airflow.operators.python import BranchPythonOperator, PythonOperator
+
     AIRFLOW_AVAILABLE = True
 except ImportError:
     AIRFLOW_AVAILABLE = False
@@ -26,16 +27,17 @@ def check_drift_callable(**kwargs) -> str:
 
 def retrain_challenger_callable(**kwargs) -> dict:
     """Trains a new Challenger model."""
-    from orchestration.retrain_pipeline import load_retraining_data, train_challenger
     import joblib
+
+    from orchestration.retrain_pipeline import load_retraining_data, train_challenger
     from training.train import ARTIFACTS_DIR
 
     train_df, val_df = load_retraining_data()
     model, metrics, version, run_id = train_challenger(train_df, val_df)
-    
+
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, ARTIFACTS_DIR / "challenger_model.joblib")
-    
+
     return {
         "metrics": metrics,
         "version": version,
@@ -45,11 +47,12 @@ def retrain_challenger_callable(**kwargs) -> dict:
 
 def evaluate_and_promote_callable(**kwargs) -> dict:
     """Evaluates the Challenger vs Champion on the holdout benchmark."""
+    import joblib
     import pandas as pd
+
     from data.split_data import PROCESSED_DIR
     from orchestration.retrain_pipeline import evaluate_and_promote_challenger
     from training.train import ARTIFACTS_DIR
-    import joblib
 
     ti = kwargs.get("ti")
     retrain_info = ti.xcom_pull(task_ids="retrain_challenger_task") if ti else {}

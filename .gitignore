@@ -34,6 +34,10 @@ mlruns/
 .pytest_cache/
 .coverage
 htmlcov/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
 
 # Logs & Temporary Files
 *.log

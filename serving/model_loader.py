@@ -7,7 +7,7 @@ import logging
 import os
 import threading
 import time
-from pathlib import Path
+
 import joblib
 import mlflow
 import mlflow.xgboost
@@ -48,7 +48,10 @@ class ModelManager:
                 self.transformer = FeatureTransformer.load(preprocessor_path)
                 logger.info("Loaded FeatureTransformer from %s", preprocessor_path)
             else:
-                logger.warning("FeatureTransformer artifact not found at %s. Creating and fitting fallback...", preprocessor_path)
+                logger.warning(
+                    "FeatureTransformer artifact not found at %s. Creating and fitting fallback...",
+                    preprocessor_path,
+                )
                 from training.train import train_baseline_model
 
                 train_baseline_model()
@@ -63,7 +66,9 @@ class ModelManager:
                 # Try alias 'production' or stage 'Production'
                 model_uri = None
                 try:
-                    alias_model = client.get_model_version_by_alias(MODEL_REGISTRY_NAME, "production")
+                    alias_model = client.get_model_version_by_alias(
+                        MODEL_REGISTRY_NAME, "production"
+                    )
                     model_uri = f"models:/{MODEL_REGISTRY_NAME}@production"
                     self.model_version = f"v{alias_model.version}"
                 except Exception:
@@ -73,7 +78,9 @@ class ModelManager:
                     production_versions = [v for v in versions if v.current_stage == "Production"]
                     if production_versions:
                         # Sort by version number descending
-                        latest_prod = sorted(production_versions, key=lambda v: int(v.version), reverse=True)[0]
+                        latest_prod = sorted(
+                            production_versions, key=lambda v: int(v.version), reverse=True
+                        )[0]
                         model_uri = f"models:/{MODEL_REGISTRY_NAME}/Production"
                         self.model_version = f"v{latest_prod.version}"
 
@@ -83,7 +90,10 @@ class ModelManager:
                     loaded_from_mlflow = True
                     logger.info("Successfully loaded MLflow model version: %s", self.model_version)
             except Exception as exc:
-                logger.warning("Could not load from MLflow Model Registry (%s). Falling back to local artifact.", exc)
+                logger.warning(
+                    "Could not load from MLflow Model Registry (%s). Falling back to local artifact.",
+                    exc,
+                )
 
             # 3. Fallback to local artifact
             if not loaded_from_mlflow:
@@ -109,7 +119,11 @@ class ModelManager:
                 else:
                     self.model_version = f"run_{payload.get('run_id', 'local')[:8]}"
 
-                logger.info("Loaded model from local artifact: %s (Threshold=%.4f)", self.model_version, self.threshold)
+                logger.info(
+                    "Loaded model from local artifact: %s (Threshold=%.4f)",
+                    self.model_version,
+                    self.threshold,
+                )
 
             self.loaded_at = time.time()
             return True

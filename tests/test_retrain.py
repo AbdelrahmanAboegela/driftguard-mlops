@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from orchestration.retrain_pipeline import evaluate_and_promote_challenger, train_challenger
 

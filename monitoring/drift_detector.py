@@ -4,13 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 import numpy as np
 import pandas as pd
@@ -59,7 +54,11 @@ def calculate_psi(
 
     if len(bin_edges) <= 2:
         # Fallback to linear histogram bins if quantiles collapse
-        bin_edges = np.linspace(min(ref_clean.min(), curr_clean.min()), max(ref_clean.max(), curr_clean.max()), num_buckets + 1)
+        bin_edges = np.linspace(
+            min(ref_clean.min(), curr_clean.min()),
+            max(ref_clean.max(), curr_clean.max()),
+            num_buckets + 1,
+        )
 
     bin_edges[0] = -np.inf
     bin_edges[-1] = np.inf
@@ -85,8 +84,19 @@ def compute_feature_drift_stats(
 ) -> dict:
     """Computes PSI and KS-test p-values for each feature."""
     if feature_cols is None:
-        exclude = {"Class", "request_id", "timestamp", "model_version", "fraud_score", "is_fraud", "latency_ms", "ground_truth"}
-        feature_cols = [c for c in reference_df.columns if c in current_df.columns and c not in exclude]
+        exclude = {
+            "Class",
+            "request_id",
+            "timestamp",
+            "model_version",
+            "fraud_score",
+            "is_fraud",
+            "latency_ms",
+            "ground_truth",
+        }
+        feature_cols = [
+            c for c in reference_df.columns if c in current_df.columns and c not in exclude
+        ]
 
     feature_metrics = {}
     drifted_features = []
@@ -104,7 +114,9 @@ def compute_feature_drift_stats(
         # KS Test (Kolmogorov-Smirnov)
         ks_stat, p_val = stats.ks_2samp(ref_series, curr_series)
 
-        is_drifted = (psi >= PSI_THRESHOLD_CRITICAL) or (p_val < 0.01 and psi >= PSI_THRESHOLD_MODERATE)
+        is_drifted = (psi >= PSI_THRESHOLD_CRITICAL) or (
+            p_val < 0.01 and psi >= PSI_THRESHOLD_MODERATE
+        )
 
         feature_metrics[col] = {
             "psi": round(psi, 4),
@@ -142,7 +154,16 @@ def generate_evidently_report(
         from evidently.metric_preset import DataDriftPreset
         from evidently.report import Report
 
-        exclude = ["Class", "request_id", "timestamp", "model_version", "fraud_score", "is_fraud", "latency_ms", "ground_truth"]
+        exclude = [
+            "Class",
+            "request_id",
+            "timestamp",
+            "model_version",
+            "fraud_score",
+            "is_fraud",
+            "latency_ms",
+            "ground_truth",
+        ]
         cols = [c for c in reference_df.columns if c in current_df.columns and c not in exclude]
 
         report = Report(metrics=[DataDriftPreset()])
@@ -151,7 +172,9 @@ def generate_evidently_report(
         logger.info("Evidently HTML drift report generated at %s", output_html_path)
         return True
     except Exception as exc:
-        logger.warning("Evidently report generation skipped (%s). Using native statistical report.", exc)
+        logger.warning(
+            "Evidently report generation skipped (%s). Using native statistical report.", exc
+        )
         return False
 
 
@@ -179,7 +202,9 @@ def evaluate_drift(
         current_df = prediction_logger.get_recent_dataframe(limit=1000)
 
     if len(current_df) < 20:
-        logger.info("Insufficient production samples (%d) to evaluate drift reliably.", len(current_df))
+        logger.info(
+            "Insufficient production samples (%d) to evaluate drift reliably.", len(current_df)
+        )
         return {
             "drift_detected": False,
             "dataset_drift_score": 0.0,

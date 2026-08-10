@@ -6,10 +6,10 @@ import json
 import logging
 import os
 from pathlib import Path
+
 import joblib
 import mlflow
 import mlflow.xgboost
-import numpy as np
 import pandas as pd
 import xgboost as xgb
 
@@ -49,7 +49,9 @@ def train_baseline_model(
         if not train_path.exists() or not val_path.exists():
             train_path, val_path, _ = split_temporal()
 
-    logger.info("Loading training data from %s and validation data from %s...", train_path, val_path)
+    logger.info(
+        "Loading training data from %s and validation data from %s...", train_path, val_path
+    )
     train_df = pd.read_parquet(train_path)
     val_df = pd.read_parquet(val_path)
 
@@ -154,7 +156,9 @@ def train_baseline_model(
                 indent=2,
             )
 
-        logger.info("Saved local fallback model to %s and metadata to %s", local_model_path, metadata_path)
+        logger.info(
+            "Saved local fallback model to %s and metadata to %s", local_model_path, metadata_path
+        )
 
         # 9. Model Registry Tagging / Aliasing
         try:

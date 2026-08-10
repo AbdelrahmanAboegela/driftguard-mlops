@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from monitoring.drift_detector import calculate_psi, compute_feature_drift_stats
 
@@ -32,7 +31,11 @@ def test_compute_feature_drift_stats():
     rng = np.random.default_rng(123)
     n = 500
 
-    ref_data = {"Amount": rng.exponential(scale=50.0, size=n), "V1": rng.normal(0, 1, size=n), "V2": rng.normal(0, 1, size=n)}
+    ref_data = {
+        "Amount": rng.exponential(scale=50.0, size=n),
+        "V1": rng.normal(0, 1, size=n),
+        "V2": rng.normal(0, 1, size=n),
+    }
     curr_data = {
         "Amount": rng.exponential(scale=250.0, size=n),  # Significant drift
         "V1": rng.normal(3.0, 1, size=n),  # Significant drift

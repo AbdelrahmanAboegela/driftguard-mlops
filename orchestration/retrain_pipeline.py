@@ -5,18 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 import httpx
 import mlflow
 import mlflow.xgboost
-import numpy as np
 import pandas as pd
 import xgboost as xgb
 
@@ -34,7 +27,9 @@ MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
 SERVING_URL = os.getenv("SERVING_URL", "http://localhost:8000")
 
 
-def load_retraining_data(additional_data: pd.DataFrame | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_retraining_data(
+    additional_data: pd.DataFrame | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Prepares enriched retraining data by combining historical training set with newly collected labeled transactions."""
     train_path = PROCESSED_DIR / "train.parquet"
     val_path = PROCESSED_DIR / "val_holdout.parquet"
@@ -46,10 +41,21 @@ def load_retraining_data(additional_data: pd.DataFrame | None = None) -> tuple[p
     val_df = pd.read_parquet(val_path)
 
     if additional_data is not None and len(additional_data) > 0:
-        logger.info("Combining %d historical records with %d newly collected records for retraining.", len(historical_train_df), len(additional_data))
+        logger.info(
+            "Combining %d historical records with %d newly collected records for retraining.",
+            len(historical_train_df),
+            len(additional_data),
+        )
         # Exclude non-feature metadata columns if present
         clean_additional = additional_data.copy()
-        for col in ["request_id", "timestamp", "model_version", "fraud_score", "is_fraud", "latency_ms"]:
+        for col in [
+            "request_id",
+            "timestamp",
+            "model_version",
+            "fraud_score",
+            "is_fraud",
+            "latency_ms",
+        ]:
             if col in clean_additional.columns:
                 clean_additional = clean_additional.drop(columns=[col])
 
@@ -167,7 +173,9 @@ def evaluate_and_promote_challenger(
 
     # 2. Decision Logic
     # Challenger must achieve at least equal or better F1 and within PR-AUC tolerance
-    is_promoted = (challenger_f1 >= champion_f1 + f1_margin) and (challenger_prauc >= champion_prauc - 0.03)
+    is_promoted = (challenger_f1 >= champion_f1 + f1_margin) and (
+        challenger_prauc >= champion_prauc - 0.03
+    )
 
     decision = {
         "promoted": is_promoted,
@@ -177,7 +185,9 @@ def evaluate_and_promote_challenger(
         "champion_prauc": champion_prauc,
         "challenger_prauc": challenger_prauc,
         "evaluated_at": datetime.now(timezone.utc).isoformat(),
-        "reason": "Challenger outperformed or matched Champion" if is_promoted else "Challenger failed to surpass Champion F1/PR-AUC",
+        "reason": "Challenger outperformed or matched Champion"
+        if is_promoted
+        else "Challenger failed to surpass Champion F1/PR-AUC",
     }
 
     if is_promoted:
@@ -185,9 +195,13 @@ def evaluate_and_promote_challenger(
         # Update MLflow Registry tags and aliases
         try:
             client = mlflow.tracking.MlflowClient()
-            client.set_model_version_tag(MODEL_REGISTRY_NAME, challenger_version, "stage", "Production")
+            client.set_model_version_tag(
+                MODEL_REGISTRY_NAME, challenger_version, "stage", "Production"
+            )
             try:
-                client.set_registered_model_alias(MODEL_REGISTRY_NAME, "production", challenger_version)
+                client.set_registered_model_alias(
+                    MODEL_REGISTRY_NAME, "production", challenger_version
+                )
             except Exception:
                 pass
         except Exception as exc:
@@ -223,7 +237,9 @@ def evaluate_and_promote_challenger(
         try:
             admin_key = os.getenv("ADMIN_API_KEY", "dev-admin-key")
             with httpx.Client(timeout=5.0) as http_client:
-                resp = http_client.post(f"{SERVING_URL}/reload-model", headers={"x-api-key": admin_key})
+                resp = http_client.post(
+                    f"{SERVING_URL}/reload-model", headers={"x-api-key": admin_key}
+                )
                 if resp.status_code == 200:
                     logger.info("Serving layer successfully hot-reloaded new production model.")
         except Exception as exc:
@@ -256,7 +272,9 @@ def run_autonomous_pipeline(
 
     train_df, val_df = load_retraining_data(additional_data)
     challenger_model, challenger_metrics, challenger_version, _ = train_challenger(train_df, val_df)
-    decision = evaluate_and_promote_challenger(challenger_model, challenger_metrics, challenger_version, val_df)
+    decision = evaluate_and_promote_challenger(
+        challenger_model, challenger_metrics, challenger_version, val_df
+    )
 
     return {
         "status": "completed",

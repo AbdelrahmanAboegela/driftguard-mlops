@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from typing import Optional
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -87,7 +88,9 @@ class PredictionResponse(BaseModel):
     """Schema for fraud inference response."""
 
     request_id: str = Field(..., description="Unique trace identifier for the request")
-    fraud_score: float = Field(..., description="Estimated probability of fraud (0.0 to 1.0)", ge=0.0, le=1.0)
+    fraud_score: float = Field(
+        ..., description="Estimated probability of fraud (0.0 to 1.0)", ge=0.0, le=1.0
+    )
     is_fraud: bool = Field(..., description="Binary classification based on the decision threshold")
     threshold_used: float = Field(..., description="Decision threshold applied")
     model_version: str = Field(..., description="Identifier of the serving model version")

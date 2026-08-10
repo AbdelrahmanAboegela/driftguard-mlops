@@ -4,13 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
 import time
-from pathlib import Path
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 from monitoring.drift_detector import evaluate_drift
 
@@ -23,7 +17,9 @@ def run_drift_monitor_iteration() -> dict:
     logger.info("Starting drift assessment cycle...")
     result = evaluate_drift(save_reports=True)
 
-    status_str = "[!] DRIFT ALERT DETECTED" if result["drift_detected"] else "[OK] SYSTEM HEALTHY (No Drift)"
+    status_str = (
+        "[!] DRIFT ALERT DETECTED" if result["drift_detected"] else "[OK] SYSTEM HEALTHY (No Drift)"
+    )
     logger.info(
         "\n================ DRIFTGUARD STATUS ================\n"
         "  Status:             %s\n"

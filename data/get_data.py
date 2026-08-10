@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -50,6 +51,7 @@ def download_from_kaggle(destination_dir: Path) -> bool:
     # Try kagglehub first
     try:
         import shutil
+
         import kagglehub
 
         logger.info("Attempting download via kagglehub...")
@@ -74,7 +76,9 @@ def download_from_kaggle(destination_dir: Path) -> bool:
             logger.info("Successfully downloaded from Kaggle.")
             return True
     except Exception as exc:
-        logger.warning("Kaggle API download unavailable (%s). Falling back to synthetic generation.", exc)
+        logger.warning(
+            "Kaggle API download unavailable (%s). Falling back to synthetic generation.", exc
+        )
 
     return False
 
@@ -92,7 +96,9 @@ def generate_synthetic_fraud_dataset(
     - Amount: Transaction Amount (skewed, log-normal distribution)
     - Class: 1 in case of fraud, 0 otherwise
     """
-    logger.info("Generating synthetic fraud dataset (n=%d, fraud_ratio=%.5f)...", n_samples, fraud_ratio)
+    logger.info(
+        "Generating synthetic fraud dataset (n=%d, fraud_ratio=%.5f)...", n_samples, fraud_ratio
+    )
     rng = np.random.default_rng(random_seed)
 
     n_fraud = int(n_samples * fraud_ratio)
@@ -112,7 +118,7 @@ def generate_synthetic_fraud_dataset(
     # Fraudulent transactions: shifted distributions with heavy tails on key features (V4, V11, V12, V14, V17)
     v_fraud = rng.normal(loc=0.0, scale=1.5, size=(n_fraud, 28)) * scales
     # Known discriminative fraud directions in PCA space
-    v_fraud[:, 3] += rng.normal(4.0, 1.2, size=n_fraud)   # V4 higher in fraud
+    v_fraud[:, 3] += rng.normal(4.0, 1.2, size=n_fraud)  # V4 higher in fraud
     v_fraud[:, 10] += rng.normal(3.5, 1.0, size=n_fraud)  # V11 higher in fraud
     v_fraud[:, 11] -= rng.normal(5.0, 1.5, size=n_fraud)  # V12 lower in fraud
     v_fraud[:, 13] -= rng.normal(6.5, 1.5, size=n_fraud)  # V14 lower in fraud

@@ -26,7 +26,7 @@ serve:
 	uvicorn serving.app:app --host 0.0.0.0 --port 8000 --reload
 
 simulate:
-	$(PYTHON) scripts/simulate_production.py
+	$(PYTHON) -m scripts.simulate_production
 
 test:
 	pytest tests/ -v

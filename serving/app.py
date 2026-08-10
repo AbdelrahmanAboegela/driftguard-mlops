@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
-import time
 import os
+import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Header, status
+
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -68,6 +69,9 @@ DATASET_DRIFT_ALERT_GAUGE = Gauge(
 )
 
 START_TIME = time.time()
+ALLOWED_ORIGINS = [
+    origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",") if origin.strip()
+]
 
 
 @asynccontextmanager
@@ -90,8 +94,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("ALLOWED_ORIGINS", "*").split(",") if os.getenv("ALLOWED_ORIGINS") else ["*"],
-    allow_credentials=True,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=ALLOWED_ORIGINS != ["*"],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
@@ -106,7 +110,9 @@ async def health_check() -> HealthResponse:
         model_version=model_manager.model_version,
         model_loaded=model_manager.model is not None,
         uptime_seconds=round(uptime, 2),
-        features_count=len(model_manager.transformer.feature_columns) if model_manager.transformer else 0,
+        features_count=len(model_manager.transformer.feature_columns)
+        if model_manager.transformer
+        else 0,
     )
 
 
@@ -166,13 +172,14 @@ async def predict_batch_transactions(
     background_tasks: BackgroundTasks,
 ) -> BatchPredictionResponse:
     """Processes a batch of transactions with high-throughput vectorized scoring."""
-    t0 = time.perf_counter()
     raw_list = [t.model_dump() for t in payload.transactions]
 
     try:
         results, batch_latency_ms = model_manager.predict_batch(raw_list)
     except Exception as exc:
-        HTTP_REQUESTS_TOTAL.labels(method="POST", endpoint="/predict/batch", status_code="500").inc()
+        HTTP_REQUESTS_TOTAL.labels(
+            method="POST", endpoint="/predict/batch", status_code="500"
+        ).inc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Batch inference failed: {str(exc)}",
