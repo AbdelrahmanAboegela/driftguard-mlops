@@ -25,6 +25,8 @@ mlflow.db
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+*.db
+serving/storage/*.db
 mlruns/
 .mlflow/
 
