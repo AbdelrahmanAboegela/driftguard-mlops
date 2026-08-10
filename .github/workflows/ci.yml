@@ -1,0 +1,42 @@
+name: DriftGuard CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff pytest httpx
+
+      - name: Lint Code with Ruff
+        run: |
+          ruff check .
+
+      - name: Run Unit & Integration Tests
+        run: |
+          pytest tests/ -v
+
+      - name: Build & Validate Docker Container
+        run: |
+          docker build -t driftguard:latest .
+          docker run --rm -d -p 8000:8000 --name test-serving driftguard:latest
+          sleep 5
+          curl -f http://localhost:8000/health || exit 1
+          docker stop test-serving

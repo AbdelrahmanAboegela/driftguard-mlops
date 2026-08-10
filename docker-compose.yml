@@ -1,0 +1,80 @@
+version: "3.8"
+
+services:
+  serving:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: driftguard-serving
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLFLOW_MODEL_NAME=driftguard-fraud
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./training/artifacts:/app/training/artifacts
+      - ./reports:/app/reports
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - driftguard-net
+    depends_on:
+      - mlflow
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.11.3
+    container_name: driftguard-mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/mlflow/mlruns
+      - ./mlflow.db:/mlflow/mlflow.db
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/mlruns
+      --host 0.0.0.0
+      --port 5000
+    networks:
+      - driftguard-net
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: driftguard-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    networks:
+      - driftguard-net
+    depends_on:
+      - serving
+
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: driftguard-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    networks:
+      - driftguard-net
+    depends_on:
+      - prometheus
+
+networks:
+  driftguard-net:
+    driver: bridge

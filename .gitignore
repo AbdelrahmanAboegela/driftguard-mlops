@@ -1,0 +1,47 @@
+# Python bytecode & environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Secrets & Environment configs
+.env
+*.env
+kaggle.json
+
+# Raw and Processed Large Datasets
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*.parquet
+!data/processed/.gitkeep
+
+# MLflow & Local SQLite Databases
+mlflow.db
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+mlruns/
+.mlflow/
+
+# Pytest & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs & Temporary Files
+*.log
+logs/
+.tmp/
+tmp/
+
+# Reports (large generated HTML reports)
+reports/*.html
+
+# OS artifacts
+.DS_Store
+Thumbs.db
