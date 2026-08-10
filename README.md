@@ -171,6 +171,26 @@ The temporal split is 65% training, 15% validation, 10% production replay, and 1
 
 The default cost policy treats one false negative as 25 times the cost of one false positive. Adjust `false_positive_cost` and `false_negative_cost` in `train_baseline_model` or `train_challenger` to match investigation and fraud-loss economics.
 
+### Reproducible strategy benchmark
+
+Run every supported strategy against one fixed temporal test period:
+
+```bash
+python -m scripts.compare_imbalance_strategies --samples 120000 --seed 42
+```
+
+The following measured run used 120,000 deterministic synthetic transactions (0.1717% fraud), a 65%/15%/10%/10% temporal split, 78,000 pre-resampling training rows, 12,000 untouched test rows, 27 test fraud cases, 100 XGBoost estimators, and a 25:1 false-negative:false-positive cost ratio.
+
+| Strategy | Train rows | Threshold | PR-AUC | F1 | Recall | Specificity | G-mean (95% CI) | FN / FP | Expected cost | Runtime (s) |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: |
+| Cost-sensitive weight only | 78,000 | 0.999822 | 1.0000 | 0.9615 | 0.9259 | 1.0000 | 0.9623 (0.9044–1.0000) | 2 / 0 | 50 | 2.72 |
+| SMOTE | 155,736 | 0.999786 | 1.0000 | 0.9615 | 0.9259 | 1.0000 | 0.9623 (0.8885–1.0000) | 2 / 0 | 50 | 6.65 |
+| ADASYN | 155,736 | 0.926126 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 (1.0000–1.0000) | 0 / 0 | 0 | 3.47 |
+| SMOTEENN | 155,734 | 0.999795 | 1.0000 | 0.9615 | 0.9259 | 1.0000 | 0.9623 (0.8885–1.0000) | 2 / 0 | 50 | 34.47 |
+| SMOTETomek | 155,736 | 0.999786 | 1.0000 | 0.9615 | 0.9259 | 1.0000 | 0.9623 (0.8885–1.0000) | 2 / 0 | 50 | 47.45 |
+
+The benchmark CSV is written to `reports/imbalance_benchmark.csv`. Its perfect PR-AUC scores reflect the deliberately separable synthetic fraud generator and should **not** be treated as a production-performance claim. Repeat this comparison on a representative, labelled production dataset before selecting a resampling strategy. The final model decision should consider the confidence intervals and cost impact, not a single point estimate.
+
 ## Development workflow
 
 ```bash

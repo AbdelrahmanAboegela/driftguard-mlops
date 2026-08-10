@@ -47,6 +47,7 @@ tmp/
 
 # Reports (large generated HTML reports)
 reports/*.html
+reports/*.log
 
 # OS artifacts
 .DS_Store
