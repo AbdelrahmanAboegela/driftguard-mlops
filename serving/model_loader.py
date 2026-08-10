@@ -67,11 +67,15 @@ class ModelManager:
                     model_uri = f"models:/{MODEL_REGISTRY_NAME}@production"
                     self.model_version = f"v{alias_model.version}"
                 except Exception:
-                    # Fallback to stage
-                    versions = client.get_latest_versions(MODEL_REGISTRY_NAME, stages=["Production"])
-                    if versions:
+                    # Fallback to stage using search_model_versions
+                    filter_string = f"name='{MODEL_REGISTRY_NAME}'"
+                    versions = client.search_model_versions(filter_string)
+                    production_versions = [v for v in versions if v.current_stage == "Production"]
+                    if production_versions:
+                        # Sort by version number descending
+                        latest_prod = sorted(production_versions, key=lambda v: int(v.version), reverse=True)[0]
                         model_uri = f"models:/{MODEL_REGISTRY_NAME}/Production"
-                        self.model_version = f"v{versions[0].version}"
+                        self.model_version = f"v{latest_prod.version}"
 
                 if model_uri:
                     logger.info("Loading production model from MLflow Registry: %s...", model_uri)

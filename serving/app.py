@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 import time
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
-from fastapi import BackgroundTasks, FastAPI, HTTPException, status
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Header, status
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -89,9 +90,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("ALLOWED_ORIGINS", "*").split(",") if os.getenv("ALLOWED_ORIGINS") else ["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -220,8 +221,11 @@ async def predict_batch_transactions(
 
 
 @app.post("/reload-model", tags=["Model Management"])
-async def reload_model() -> dict[str, str]:
+def reload_model(x_api_key: str = Header(None)) -> dict:
     """Hot-reloads the production model from MLflow Registry or local store."""
+    expected_api_key = os.getenv("ADMIN_API_KEY", "dev-admin-key")
+    if x_api_key != expected_api_key:
+        raise HTTPException(status_code=401, detail="Unauthorized")
     try:
         model_manager.load(force_reload=True)
         ACTIVE_MODEL_VERSION._metrics.clear()

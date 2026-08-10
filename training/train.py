@@ -160,9 +160,10 @@ def train_baseline_model(
         try:
             client = mlflow.tracking.MlflowClient()
             # Get latest version registered
-            latest_versions = client.get_latest_versions(MODEL_REGISTRY_NAME)
-            if latest_versions:
-                latest_v = latest_versions[-1].version
+            versions = client.search_model_versions(f"name='{MODEL_REGISTRY_NAME}'")
+            sorted_versions = sorted(versions, key=lambda v: int(v.version))
+            if sorted_versions:
+                latest_v = sorted_versions[-1].version
                 tag_name = "Production" if tag_as_production else "Staging"
                 client.set_model_version_tag(MODEL_REGISTRY_NAME, latest_v, "stage", tag_name)
                 # Set alias for modern MLflow client

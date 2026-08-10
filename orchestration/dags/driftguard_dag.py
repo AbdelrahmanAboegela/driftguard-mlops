@@ -27,9 +27,15 @@ def check_drift_callable(**kwargs) -> str:
 def retrain_challenger_callable(**kwargs) -> dict:
     """Trains a new Challenger model."""
     from orchestration.retrain_pipeline import load_retraining_data, train_challenger
+    import joblib
+    from training.train import ARTIFACTS_DIR
 
     train_df, val_df = load_retraining_data()
     model, metrics, version, run_id = train_challenger(train_df, val_df)
+    
+    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+    joblib.dump(model, ARTIFACTS_DIR / "challenger_model.joblib")
+    
     return {
         "metrics": metrics,
         "version": version,
@@ -49,7 +55,7 @@ def evaluate_and_promote_callable(**kwargs) -> dict:
     retrain_info = ti.xcom_pull(task_ids="retrain_challenger_task") if ti else {}
 
     val_df = pd.read_parquet(PROCESSED_DIR / "val_holdout.parquet")
-    challenger_model = joblib.load(ARTIFACTS_DIR / "champion_model.joblib")["model"]
+    challenger_model = joblib.load(ARTIFACTS_DIR / "challenger_model.joblib")
     challenger_metrics = retrain_info.get("metrics", {})
     challenger_version = retrain_info.get("version", "unknown")
 

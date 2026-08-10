@@ -101,7 +101,7 @@ def run_production_simulation(
     train_baseline_df = pd.read_parquet(PROCESSED_DIR / "train.parquet")
     clean_drift_stats = compute_feature_drift_stats(train_baseline_df, clean_segment)
     logger.info(
-        "Clean Phase Drift Status: ShareDrifted=%.2f%%, MaxPSI=%.4f (Expected < 0.25)",
+        "Clean Phase Status: Temporal shift (ShareDrifted=%.2f%%, MaxPSI=%.4f). (Expected temporal drift due to time-based split).",
         clean_drift_stats["share_drifted"] * 100,
         clean_drift_stats["max_feature_psi"],
     )

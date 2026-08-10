@@ -121,8 +121,9 @@ def train_challenger(
 
         # Get the new model version
         client = mlflow.tracking.MlflowClient()
-        latest_versions = client.get_latest_versions(MODEL_REGISTRY_NAME)
-        challenger_version = latest_versions[-1].version if latest_versions else "unknown"
+        versions = client.search_model_versions(f"name='{MODEL_REGISTRY_NAME}'")
+        sorted_versions = sorted(versions, key=lambda v: int(v.version))
+        challenger_version = sorted_versions[-1].version if sorted_versions else "unknown"
         client.set_model_version_tag(MODEL_REGISTRY_NAME, challenger_version, "stage", "Staging")
 
         # Save transformer as staging artifact
