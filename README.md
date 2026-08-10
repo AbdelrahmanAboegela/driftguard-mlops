@@ -1,169 +1,212 @@
-# 🛡️ DriftGuard — Drift-Aware Fraud Detection & Autonomous Retraining
+# DriftGuard
 
-[![CI/CD Pipeline](https://github.com/AbdelrahmanAboegela/driftguard-mlops/actions/workflows/ci.yml/badge.svg)](https://github.com/AbdelrahmanAboegela/driftguard-mlops/actions)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
-[![MLflow](https://img.shields.io/badge/MLflow-2.11+-orange.svg)](https://mlflow.org/)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
+[![Continuous Integration](https://github.com/AbdelrahmanAboegela/driftguard-mlops/actions/workflows/ci.yml/badge.svg)](https://github.com/AbdelrahmanAboegela/driftguard-mlops/actions/workflows/ci.yml)
 
-**DriftGuard** is an end-to-end, production-grade MLOps system that detects **covariate** and **concept drift** in real-time transaction streams and autonomously triggers **champion-challenger retraining, evaluation, and zero-downtime hot-reloading**.
+DriftGuard is a reference MLOps system for fraud-risk scoring. It combines a FastAPI inference service, statistical data-drift monitoring, champion/challenger model evaluation, MLflow tracking, and Prometheus/Grafana observability.
 
----
+## Architecture
 
-## 📐 System Architecture
-
-```
-                    ┌─────────────────────────┐
-   Transaction ───► │  FastAPI (/predict)     │───► Prediction + Prometheus Metrics
-   Stream           └────────────┬────────────┘
-                                 │
-                                 ▼
-                    ┌─────────────────────────┐
-                    │ Async WAL Logger        │
-                    └────────────┬────────────┘
-                                 │
-                                 ▼
-                    ┌─────────────────────────┐
-                    │ Statistical Drift Engine│ (PSI & KS-Test, threshold > 0.25)
-                    └────────────┬────────────┘
-                                 │ (Drift Alert Triggered)
-                                 ▼
-                    ┌─────────────────────────┐
-                    │ Retraining Pipeline     │ (Enriched Historical + Recent Stream)
-                    └────────────┬────────────┘
-                                 │
-                                 ▼
-                    ┌─────────────────────────┐
-                    │ MLflow Model Registry   │ (Champion vs Challenger Benchmark)
-                    └────────────┬────────────┘
-                                 │ (Zero-Downtime Hot-Reload)
-                                 ▼
-                    ┌─────────────────────────┐
-                    │ FastAPI Model Reload    │ (/reload-model)
-                    └─────────────────────────┘
+```mermaid
+flowchart LR
+    Client["Transaction client"] --> API["FastAPI inference API"]
+    API --> Model["Model manager"]
+    Model --> Response["Risk score and decision"]
+    API --> Audit["SQLite audit log"]
+    Audit --> Monitor["Drift detector"]
+    Monitor -->|"drift threshold exceeded"| Retrain["Retraining pipeline"]
+    Retrain --> MLflow["MLflow model registry"]
+    MLflow -->|"promoted challenger"| Model
+    API --> Prometheus["Prometheus metrics"]
+    Prometheus --> Grafana["Grafana dashboard"]
 ```
 
----
+## Prerequisites
 
-## 🌟 Key Features
+- Python 3.10 or later (the CI pipeline uses Python 3.11)
+- Docker and Docker Compose for the full local stack
 
-1. **High-Throughput Serving**: Sub-10ms p95 latency FastAPI inference engine supporting single-record and high-density batch scoring.
-2. **Real-Time Observability**: Built-in Prometheus metrics (`driftguard_http_requests_total`, `driftguard_prediction_latency_seconds`, `driftguard_fraud_score_distribution`, `driftguard_feature_psi`).
-3. **Statistical Drift Detection**: Population Stability Index (PSI) and Kolmogorov-Smirnov (KS) test monitoring across raw and engineered dimensions.
-4. **Autonomous Champion-Challenger Workflow**: Automatically retrains XGBoost upon critical drift detection and promotes challengers only if they outperform the incumbent champion on validation holdouts.
-5. **Zero-Downtime Hot-Reloading**: In-memory model swapping via thread-safe `ModelManager` without dropping inflight requests.
-6. **Full-Stack Containerization**: One-command launch with Docker Compose for FastAPI, MLflow Tracking Server, Prometheus, and Grafana.
+## Quick start
 
----
-
-## 📊 End-to-End Simulation Benchmark
-
-Under high-velocity simulated covariate shift (macroeconomic inflation) and adversarial concept drift (micro-transaction card testing):
-
-| Phase | Model Version | PR-AUC | F1 Score | Precision | Recall | Missed Fraud (FNR %) | Drift Status |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **1. Pre-Drift (Clean Traffic)** | `v1` | **0.8501** | **0.8713** | 0.9778 | 0.7857 | 21.4% | No Drift |
-| **2. Post-Drift (Stale Baseline)** | `v1` | 0.0404 | 0.0417 | 0.0303 | 0.0667 | **93.3%** | 🚨 **CRITICAL DRIFT** (PSI > 0.25) |
-| **3. Post-Retrain (Promoted Challenger)** | `v2` | **0.4141** | **0.5055** | 0.5000 | 0.5111 | **48.8%** | 🛡️ **Recovered & Adapted** |
-
-- ⚡ **Retraining Latency**: ~37 seconds autonomous execution
-- 🛡️ **Missed Fraud Reduction**: 44.5% absolute FNR drop recovery
-
----
-
-## 🚀 Quick Start
-
-### 1. Clone & Install
 ```bash
 git clone https://github.com/AbdelrahmanAboegela/driftguard-mlops.git
 cd driftguard-mlops
-pip install -r requirements.txt
+python -m pip install ".[dev]"
+python -m pytest -v
 ```
 
-### 2. Download Data & Train Champion Model
+The repository includes a trained local model artifact for development and testing. To generate data and train a new baseline model:
+
 ```bash
-# Split temporal dataset (70% Train, 15% Holdout, 15% Stream)
-python data/split_data.py
-
-# Train baseline XGBoost champion and register to MLflow
-python training/train.py
+python -m data.split_data
+python -m training.train
 ```
 
-### 3. Launch Local Serving API
+Start the API:
+
 ```bash
 uvicorn serving.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 4. Run Production Simulation
-```bash
-python scripts/simulate_production.py
-```
-
----
-
-## 🐳 Running with Docker Compose
-
-Launch the complete microservices stack (FastAPI, MLflow, Prometheus, Grafana) with a single command:
+Verify it in another terminal:
 
 ```bash
-docker-compose up -d --build
+curl http://localhost:8000/health
 ```
 
-- **Inference API**: [http://localhost:8000](http://localhost:8000)
-- **API Docs (Swagger UI)**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **MLflow Tracking UI**: [http://localhost:5000](http://localhost:5000)
-- **Prometheus UI**: [http://localhost:9090](http://localhost:9090)
-- **Grafana Dashboard**: [http://localhost:3000](http://localhost:3000) *(admin / admin)*
+Interactive API documentation is available at `http://localhost:8000/docs`.
 
----
+## API guide
 
-## 🧪 Testing Suite
+The service accepts the `Time`, `Amount`, and `V1` through `V28` numerical fields from the credit-card-fraud feature schema. `request_id` is optional; the API generates one when it is omitted.
 
-Execute comprehensive unit, integration, and drift tests:
+| Endpoint | Method | Use |
+| --- | --- | --- |
+| `/health` | `GET` | Liveness and loaded-model status |
+| `/predict` | `POST` | Score one transaction |
+| `/predict/batch` | `POST` | Score a list of transactions |
+| `/drift/status` | `GET` | Most recent drift evaluation summary |
+| `/metrics` | `GET` | Prometheus metrics exposition |
+| `/reload-model` | `POST` | Reload the active model; requires `x-api-key` |
+
+Example single-transaction request:
 
 ```bash
-pytest tests/ -v
+curl --request POST http://localhost:8000/predict \
+  --header "Content-Type: application/json" \
+  --data '{
+    "Time": 406.0,
+    "Amount": 149.62,
+    "V1": -2.31, "V2": 1.95, "V3": -1.60, "V4": 3.99,
+    "V5": -0.52, "V6": -1.42, "V7": -2.53, "V8": 1.39,
+    "V9": -2.77, "V10": -2.77, "V11": 3.20, "V12": -2.89,
+    "V13": -0.59, "V14": -4.28, "V15": 0.38, "V16": -1.14,
+    "V17": -2.83, "V18": -0.01, "V19": 0.41, "V20": 0.12,
+    "V21": 0.51, "V22": -0.03, "V23": -0.46, "V24": 0.32,
+    "V25": 0.04, "V26": 0.17, "V27": 0.26, "V28": -0.14
+  }'
 ```
 
----
+Responses include the fraud probability, binary decision, model version, threshold used, request identifier, and inference latency. Invalid or incomplete input returns FastAPI's standard `422` validation response.
 
-## 📂 Project Structure
+## Configuration
 
-```
-driftguard-mlops/
-├── data/
-│   └── split_data.py          # Temporal train/validation/stream data splitter
-├── training/
-│   ├── feature_engineering.py # RobustScaler + cyclical time transformations
-│   ├── train.py               # Baseline training & MLflow registration
-│   └── evaluate.py            # PR-AUC, F1, FNR, threshold optimization
-├── serving/
-│   ├── app.py                 # FastAPI service with Prometheus middleware
-│   ├── model_loader.py        # Thread-safe MLflow registry hot-reloader
-│   ├── logger.py              # Asynchronous WAL transaction logger
-│   └── schemas.py             # Pydantic v2 schemas & request validation
-├── monitoring/
-│   ├── drift_detector.py      # PSI & KS-test statistical evaluation engine
-│   ├── inject_drift.py        # Synthetic covariate & concept drift generator
-│   └── metrics_exporter.py    # Background periodic drift evaluator
-├── orchestration/
-│   ├── retrain_pipeline.py    # Champion-challenger validation & promotion
-│   ├── rollback.py            # Disaster recovery rollback utility
-│   └── dags/                  # Apache Airflow autonomous DAG definitions
-├── load_testing/
-│   └── locustfile.py          # High-concurrency traffic simulation
-├── scripts/
-│   ├── simulate_production.py # E2E drift injection and auto-retrain demo
-│   └── run_load_test.py       # Performance benchmarking runner
-├── grafana/                   # Pre-configured Grafana monitoring dashboards
-├── prometheus/                # Prometheus scraping configuration
-├── tests/                     # Comprehensive test suite (11 unit/integration tests)
-├── Dockerfile                 # Multi-stage production container build
-├── docker-compose.yml         # Containerized microservices definition
-└── Makefile                   # Common development workflows
+Copy `.env.example` to `.env` and set values appropriate for your environment. In particular, replace the development-only `ADMIN_API_KEY` before exposing the service. `ALLOWED_ORIGINS` should be an explicit, comma-separated list of browser origins in production.
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `ADMIN_API_KEY` | Authorizes `POST /reload-model` | `dev-admin-key` |
+| `MLFLOW_TRACKING_URI` | MLflow tracking and registry backend | `sqlite:///mlflow.db` |
+| `MLFLOW_MODEL_NAME` | Registered model name | `driftguard-fraud` |
+| `SERVING_URL` | URL used by orchestration callbacks | `http://localhost:8000` |
+| `ALLOWED_ORIGINS` | Comma-separated CORS allowlist | `*` |
+
+## Full local stack
+
+```bash
+docker compose up --build
 ```
 
----
+| Service | Address |
+| --- | --- |
+| Inference API | `http://localhost:8000` |
+| API documentation | `http://localhost:8000/docs` |
+| MLflow | `http://localhost:5000` |
+| Prometheus | `http://localhost:9090` |
+| Grafana | `http://localhost:3000` |
 
-## 📜 License
+For local-only use, Grafana is provisioned with `admin` / `admin`. Set a unique `GF_SECURITY_ADMIN_PASSWORD` through your Compose environment before deployment.
+
+Stop the stack with `docker compose down`.
+
+## Drift monitoring and retraining
+
+DriftGuard compares recent logged traffic against the temporal training baseline. It evaluates Population Stability Index (PSI) and a Kolmogorov-Smirnov test per feature.
+
+| Signal | Interpretation |
+| --- | --- |
+| PSI below `0.10` | Stable |
+| PSI from `0.10` to below `0.25` | Monitor |
+| PSI `0.25` or higher | Significant feature drift |
+
+The detector triggers when at least 20% of evaluated features are drifted or any feature has PSI of at least `0.25`. It requires at least 20 recent records. Evaluation writes `reports/drift_summary.json` and, when Evidently can render it, `reports/drift_report.html`.
+
+```mermaid
+sequenceDiagram
+    participant Traffic as Logged traffic
+    participant Drift as Drift detector
+    participant Pipeline as Retraining pipeline
+    participant Registry as MLflow registry
+    participant API as Serving API
+
+    Traffic->>Drift: Recent feature window
+    Drift->>Drift: PSI and KS evaluation
+    alt Drift detected
+        Drift->>Pipeline: Request retraining
+        Pipeline->>Registry: Register challenger
+        Pipeline->>Pipeline: Compare fixed validation holdout
+        alt Challenger passes promotion rules
+            Pipeline->>Registry: Mark production version
+            Pipeline->>API: Authenticated model reload
+        else Challenger rejected
+            Pipeline-->>API: Keep champion active
+        end
+    end
+```
+
+Run an end-to-end local exercise with:
+
+```bash
+python -m scripts.simulate_production
+```
+
+This command may generate source data, reports, MLflow state, and new local model artifacts. Run it only in a disposable local development environment unless those outputs are intentionally managed.
+
+## Development workflow
+
+```bash
+python -m ruff format .
+python -m ruff check .
+python -m pytest -v
+python -m build --wheel
+```
+
+The GitHub Actions workflow applies the same checks, then builds the container and waits for the `/health` endpoint to become available.
+
+```mermaid
+flowchart LR
+    Push["Push or pull request"] --> Quality["Format, lint, tests"]
+    Quality --> Wheel["Build wheel"]
+    Wheel --> Image["Build container image"]
+    Image --> Smoke["Health endpoint smoke test"]
+```
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| API health is `degraded` | Confirm `training/artifacts/champion_model.joblib` and `preprocessor.joblib` exist, then inspect API logs. |
+| Data commands fail writing Parquet | Reinstall dependencies with `python -m pip install ".[dev]"`; `pyarrow` is required. |
+| Model reload returns `401` | Send the `x-api-key` header matching `ADMIN_API_KEY`. |
+| No drift is reported | At least 20 logged records are required; inspect `/drift/status` and `reports/drift_summary.json`. |
+| Compose service cannot connect to MLflow | Check `docker compose ps` and use the internal `http://mlflow:5000` URI from containers. |
+
+## Project layout
+
+| Path | Responsibility |
+| --- | --- |
+| `serving/` | API schemas, model lifecycle, prediction logging, and metrics |
+| `training/` | Feature engineering, training, and evaluation |
+| `monitoring/` | PSI/KS drift evaluation and drift injection |
+| `orchestration/` | Challenger training, promotion, rollback, and Airflow DAG |
+| `data/` | Dataset retrieval and temporal splitting |
+| `tests/` | Unit and API integration coverage |
+
+## Operational notes
+
+- The `POST /reload-model` endpoint requires the `x-api-key` header.
+- The data download falls back to a synthetic fraud dataset when Kaggle credentials are unavailable.
+- Run the simulation as `python -m scripts.simulate_production`. It creates local data, runs drift evaluation, and may update local model artifacts and reports.
+
+## License
+
 MIT License.
