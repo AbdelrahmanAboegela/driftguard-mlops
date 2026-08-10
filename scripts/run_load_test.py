@@ -100,7 +100,7 @@ async def run_benchmark(
     print(f"  Concurrency:         {concurrency}")
     print(f"  Success / Failed:    {results['success_count']} / {results['failure_count']}")
     print(f"  Duration:            {results['total_time_sec']}s")
-    print(f"  ⚡ Throughput:        {results['throughput_rps']} req/s")
+    print(f"  * Throughput:        {results['throughput_rps']} req/s")
     print("-" * 60)
     print(f"  p50 (Median) Latency:{results['latency_p50_ms']} ms")
     print(f"  p90 Latency:         {results['latency_p90_ms']} ms")
